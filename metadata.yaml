@@ -1,9 +1,9 @@
 name: astrbot_plugin_qqofficial_quote
-display_name: QQ官方引用消息+ASR适配(配置文件开关)
-desc: 为QQ官方适配器补全引用消息解析+QQ内置ASR语音识别。编辑config.json中enable_quote/enable_asr开关后重启生效。AstrBot 4.26.x已内置quote时自动跳过重复patch。
-version: v0.4.0
+display_name: QQ官方内置ASR语音识别
+desc: 为QQ官方适配器补全QQ内置ASR语音转文字(免费腾讯ASR,零配置)。引用消息解析已移除(AstrBot 4.26.x原生支持)。支持raw_data直读/parser缓存/webhook三种路径。
+version: v0.5.0
 author: yuweitk
-repo: https://github.com/yuweitk/astrbot_plugin_qqofficial_quote
+repo: https://github.com/yuweitk/astrbot_plugin_qqofficial_asr
 support_platforms:
   - qq_official
   - qq_official_webhook
