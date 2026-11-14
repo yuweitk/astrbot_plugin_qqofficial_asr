@@ -1,4 +1,4 @@
-# astrbot_plugin_qqofficial_quote
+# astrbot_plugin_qqofficial_asr
 
 > 为 AstrBot QQ 官方适配器补全 **QQ内置ASR语音转文字** 能力（v0.5.0 起为纯 ASR 插件）
 
