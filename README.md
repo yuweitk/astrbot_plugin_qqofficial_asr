@@ -1,6 +1,6 @@
 # astrbot_plugin_qqofficial_asr
 
-> 为 AstrBot QQ 官方适配器补全 **QQ内置ASR语音转文字** 能力（v0.5.0 起为纯 ASR 插件）
+> 为 AstrBot QQ 官方适配器补全 **QQ内置ASR语音转文字** 能力（v0.5.0 起为纯 ASR 插件, v0.5.1 清理残留 quote 命名）
 
 ## 功能
 
@@ -44,6 +44,7 @@ QQ 推送消息 payload
 
 ## 变更记录
 
+- **v0.5.1**: 清理残留的 `qqquote` 指令与 quote 旧命名(类名/日志/注册名/patch标记), 纯 ASR
 - **v0.5.0**: 移除引用消息解析功能(AstrBot 4.26.x 已原生支持); `_parse_from_qqofficial` patch 改用 `**kwargs` 透传,兼容新版 `bot` 仅关键字参数(修复普通群聊消息 TypeError)
 - **v0.4.0**: 引用消息 + ASR 双功能,配置开关
 
@@ -64,8 +65,8 @@ git clone https://github.com/yuweitk/astrbot_plugin_qqofficial_asr.git
 
 重启后检查日志,应看到:
 ```
-[qqofficial_quote] 插件已加载,等待平台就绪后自动应用 patch...
-[qqofficial_quote] patch 已应用 (asr=启用(raw_data))
+[qqofficial_asr] 插件已加载,等待平台就绪后自动应用 patch...
+[qqofficial_asr] patch 已应用 (asr=启用(raw_data))
 ```
 
 ## 配置

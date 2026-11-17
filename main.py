@@ -9,8 +9,6 @@ AstrBot 插件: QQ官方内置ASR语音识别
 - 旧 AstrBot: 经 botpy parser / webhook 捕获原始 attachments 后缓存提取
 - Webhook 模式: HTTP 入口提前捕获
 
-注: 引用消息解析已移除(AstrBot 4.26.x 已原生支持)。
-
 参考实现: https://github.com/NousResearch/hermes-agent (gateway/platforms/qqbot)
 """
 
@@ -21,9 +19,12 @@ import threading
 import time
 
 from astrbot.api import AstrBotConfig, logger
-from astrbot.api.event import filter, AstrMessageEvent
+from astrbot.api.event import filter
 from astrbot.api.message_components import Plain
 from astrbot.api.star import Context, Star, register
+
+PLUGIN_NAME = "astrbot_plugin_qqofficial_asr"
+LOG_TAG = "[qqofficial_asr]"
 
 
 def _detect_new_adapter() -> bool:
@@ -133,7 +134,7 @@ def _apply_patches(context: Context, config: dict | None = None) -> None:
     if _patch_applied:
         return
     if not _APPLY_ASR:
-        logger.info("[qqofficial_quote] ASR 功能关闭, 跳过全部 patch")
+        logger.info(f"{LOG_TAG} ASR 功能关闭, 跳过全部 patch")
         _patch_applied = True
         return
     # parser patch：仅在旧 AstrBot(无 raw_data)时需要,用于捕获原始 attachments
@@ -141,22 +142,22 @@ def _apply_patches(context: Context, config: dict | None = None) -> None:
         try:
             _patch_connection_state_parsers()
         except Exception as e:
-            logger.warning(f"[qqofficial_quote] parser patch 失败: {e}")
+            logger.warning(f"{LOG_TAG} parser patch 失败: {e}")
     else:
-        logger.info("[qqofficial_quote] 跳过 parser patch (AstrBot 已原生保留 raw_data)")
+        logger.info(f"{LOG_TAG} 跳过 parser patch (AstrBot 已原生保留 raw_data)")
     # parse patch：总是 patch（ASR 从 raw_data 或缓存注入）
     try:
         _patch_parse_from_qqofficial()
     except Exception as e:
-        logger.warning(f"[qqofficial_quote] _parse_from_qqofficial patch 失败: {e}")
+        logger.warning(f"{LOG_TAG} _parse_from_qqofficial patch 失败: {e}")
     # webhook patch：webhook 模式在 HTTP 入口提前捕获
     try:
         _patch_webhook_handle_callback(context)
     except Exception as e:
-        logger.warning(f"[qqofficial_quote] webhook patch 失败: {e}")
+        logger.warning(f"{LOG_TAG} webhook patch 失败: {e}")
     _patch_applied = True
     logger.info(
-        f"[qqofficial_quote] patch 已应用 "
+        f"{LOG_TAG} patch 已应用 "
         f"(asr={'启用(raw_data)' if _HAS_RAW_DATA else '启用(cache)'})"
     )
 
@@ -165,7 +166,7 @@ def _patch_connection_state_parsers() -> None:
     try:
         from botpy.connection import ConnectionState
     except ImportError:
-        logger.warning("[qqofficial_quote] botpy 未安装, 跳过 parser patch")
+        logger.warning(f"{LOG_TAG} botpy 未安装, 跳过 parser patch")
         return
     event_names = [
         "group_at_message_create", "group_message_create",
@@ -174,7 +175,7 @@ def _patch_connection_state_parsers() -> None:
     for event_name in event_names:
         parser_name = f"parse_{event_name}"
         orig = getattr(ConnectionState, parser_name, None)
-        if orig is None or getattr(orig, "_qq_quote_patched", False):
+        if orig is None or getattr(orig, "_qq_asr_patched", False):
             continue
         def _make_wrapper(o, n=parser_name):
             def wrapped(self, payload):
@@ -183,7 +184,7 @@ def _patch_connection_state_parsers() -> None:
                 if mid and _APPLY_ASR and d.get("attachments"):
                     _store_raw_attachments(str(mid), d.get("attachments"))
                 return o(self, payload)
-            wrapped._qq_quote_patched = True
+            wrapped._qq_asr_patched = True
             return wrapped
         setattr(ConnectionState, parser_name, _make_wrapper(orig))
         _patched_parsers.add(parser_name)
@@ -195,10 +196,10 @@ def _patch_parse_from_qqofficial() -> None:
             QQOfficialPlatformAdapter,
         )
     except ImportError:
-        logger.warning("[qqofficial_quote] 无法导入 QQOfficialPlatformAdapter")
+        logger.warning(f"{LOG_TAG} 无法导入 QQOfficialPlatformAdapter")
         return
     orig = QQOfficialPlatformAdapter._parse_from_qqofficial
-    if getattr(orig, "_qq_quote_patched", False):
+    if getattr(orig, "_qq_asr_patched", False):
         return
     async def patched(message, msg_type, force_group_mention=False, **kwargs):
         abm = await orig(message, msg_type, force_group_mention=force_group_mention, **kwargs)
@@ -222,9 +223,9 @@ def _patch_parse_from_qqofficial() -> None:
                     blk = "\n".join(f"[语音转文字] {t}" for t in ts)
                     abm.message_str = f"{abm.message_str}\n{blk}" if abm.message_str else blk
         return abm
-    patched._qq_quote_patched = True
+    patched._qq_asr_patched = True
     QQOfficialPlatformAdapter._parse_from_qqofficial = staticmethod(patched)
-    logger.info("[qqofficial_quote] 已 patch _parse_from_qqofficial")
+    logger.info(f"{LOG_TAG} 已 patch _parse_from_qqofficial")
 
 
 def _patch_webhook_handle_callback(context: Context) -> None:
@@ -239,7 +240,7 @@ def _patch_webhook_handle_callback(context: Context) -> None:
     except ImportError:
         return
     orig = QQOfficialWebhook.handle_callback
-    if getattr(orig, "_qq_quote_patched", False):
+    if getattr(orig, "_qq_asr_patched", False):
         return
     async def patched_handle(self, request):
         try:
@@ -253,9 +254,9 @@ def _patch_webhook_handle_callback(context: Context) -> None:
         except Exception:
             pass
         return await orig(self, request)
-    patched_handle._qq_quote_patched = True
+    patched_handle._qq_asr_patched = True
     QQOfficialWebhook.handle_callback = patched_handle
-    logger.info("[qqofficial_quote] 已 patch QQOfficialWebhook.handle_callback")
+    logger.info(f"{LOG_TAG} 已 patch QQOfficialWebhook.handle_callback")
 
 
 # ====================================================================
@@ -264,12 +265,12 @@ def _patch_webhook_handle_callback(context: Context) -> None:
 
 
 @register(
-    "astrbot_plugin_qqofficial_quote",
+    PLUGIN_NAME,
     "yuweitk",
     "QQ官方内置ASR语音识别",
-    "0.5.0",
+    "0.5.1",
 )
-class QQOfficialQuotePlugin(Star):
+class QQOfficialAsrPlugin(Star):
 
     def __init__(self, context: Context, config: AstrBotConfig | None = None) -> None:
         super().__init__(context)
@@ -279,7 +280,7 @@ class QQOfficialQuotePlugin(Star):
 
     async def initialize(self) -> None:
         logger.info(
-            f"[qqofficial_quote] v0.5.0 已加载 "
+            f"{LOG_TAG} v0.5.1 已加载 "
             f"(asr={'启用' if self.config.get('enable_asr', True) else '关闭'}, "
             f"新版适配器raw_data={'是' if _detect_new_adapter() else '否'})"
         )
@@ -289,20 +290,7 @@ class QQOfficialQuotePlugin(Star):
         try:
             _apply_patches(self.context, dict(self.config))
         except Exception as e:
-            logger.error(f"[qqofficial_quote] 应用 patch 失败: {e}", exc_info=True)
-
-    @filter.command("qqquote")
-    async def cmd_qqquote(self, event: AstrMessageEvent):
-        """查看当前配置: /qqquote"""
-        ea = self.config.get("enable_asr", True)
-        yield event.plain_result(
-            f"【QQ官方ASR插件 v0.5.0 配置】\n\n"
-            f"ASR语音转文字:  {'✅ 启用' if ea else '❌ 关闭'}\n"
-            f"引用消息解析: 已移除(AstrBot 4.26.x 原生支持)\n\n"
-            f"📁 配置文件: _conf_schema.json\n"
-            f"   在 WebUI 管理面板直接修改, 保存后重启 AstrBot 生效\n"
-            f"   当前: enable_asr={str(ea).lower()}"
-        )
+            logger.error(f"{LOG_TAG} 应用 patch 失败: {e}", exc_info=True)
 
     async def terminate(self) -> None:
         global _patch_applied
@@ -310,4 +298,4 @@ class QQOfficialQuotePlugin(Star):
         with _cache_lock:
             _raw_attachments_cache.clear()
             _raw_attachments_timestamps.clear()
-        logger.info("[qqofficial_quote] 插件已卸载")
+        logger.info(f"{LOG_TAG} 插件已卸载")
